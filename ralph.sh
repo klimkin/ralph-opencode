@@ -6,7 +6,7 @@ set -e
 
 MAX_ITERATIONS=${1:-10}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TASKS_DIR="$SCRIPT_DIR/tasks"
+TASKS_DIR="$(pwd)/tasks"
 PRD_FILE="$TASKS_DIR/prd.json"
 PROGRESS_FILE="$TASKS_DIR/progress.txt"
 ARCHIVE_DIR="$TASKS_DIR/archive"

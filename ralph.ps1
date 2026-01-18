@@ -9,7 +9,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = $PSScriptRoot
-$TasksDir = Join-Path $ScriptDir "tasks"
+$TasksDir = Join-Path (Get-Location) "tasks"
 $PrdFile = Join-Path $TasksDir "prd.json"
 $ProgressFile = Join-Path $TasksDir "progress.txt"
 $ArchiveDir = Join-Path $TasksDir "archive"
