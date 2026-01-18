@@ -14,6 +14,7 @@ $PrdFile = Join-Path $TasksDir "prd.json"
 $ProgressFile = Join-Path $TasksDir "progress.txt"
 $ArchiveDir = Join-Path $TasksDir "archive"
 $LastBranchFile = Join-Path $TasksDir ".last-branch"
+$PromptFile = Join-Path $ScriptDir "prompt.md"
 
 # Archive previous run if branch changed
 if ((Test-Path $PrdFile) -and (Test-Path $LastBranchFile)) {
@@ -123,9 +124,8 @@ while ($i -lt $MaxIterations) {
     }
     
     # Run opencode with the ralph prompt
-    $PromptPath = Join-Path $ScriptDir "prompt.md"
     try {
-        opencode run --model "github-copilot/claude-opus-4.5" --agent Build --file $PromptPath "Execute the next story"
+        opencode run --model github-copilot/claude-opus-4.5 --agent build "Execute the next story" --file $PromptFile
     } catch {
         # Continue even if opencode fails
     }

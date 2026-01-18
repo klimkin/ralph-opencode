@@ -11,6 +11,7 @@ PRD_FILE="$TASKS_DIR/prd.json"
 PROGRESS_FILE="$TASKS_DIR/progress.txt"
 ARCHIVE_DIR="$TASKS_DIR/archive"
 LAST_BRANCH_FILE="$TASKS_DIR/.last-branch"
+PROMPT_FILE="$SCRIPT_DIR/prompt.md"
 
 # Archive previous run if branch changed
 if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
@@ -97,7 +98,7 @@ while [ $i -lt $MAX_ITERATIONS ]; do
   fi
   
   # Run opencode with the ralph prompt
-  opencode run --model "github-copilot/claude-opus-4.5" --agent Build --file "$SCRIPT_DIR/prompt.md" "Execute the next story" || true
+  opencode run --model github-copilot/claude-opus-4.5 --agent build "Execute the next story" --file "$PROMPT_FILE" || true
   
   sleep 2
 done
