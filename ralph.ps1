@@ -90,7 +90,7 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
     # Run opencode with the ralph prompt
     $PromptPath = Join-Path $ScriptDir "prompt.md"
     try {
-        opencode run --model "github-copilot/claude-opus-4.5" --agent Build "Follow instructions in $PromptPath"
+        opencode run --model "github-copilot/claude-opus-4.5" --agent Build --file $PromptPath "Execute the next story"
     } catch {
         # Continue even if opencode fails
     }

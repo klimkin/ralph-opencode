@@ -69,7 +69,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   echo "═══════════════════════════════════════════════════════"
   
   # Run opencode with the ralph prompt
-  opencode run --model "github-copilot/claude-opus-4.5" --agent Build "Follow instructions in $SCRIPT_DIR/prompt.md" || true
+  opencode run --model "github-copilot/claude-opus-4.5" --agent Build --file "$SCRIPT_DIR/prompt.md" "Execute the next story" || true
   
   # Check if all stories in prd.json are complete
   if [ -f "$PRD_FILE" ]; then
