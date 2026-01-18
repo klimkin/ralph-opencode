@@ -16,7 +16,6 @@ LAST_BRANCH_FILE="$TASKS_DIR/.last-branch"
 if [ ! -f "$PRD_FILE" ]; then
   echo "Error: $PRD_FILE not found."
   echo "Create a prd.json file in the tasks/ directory before running Ralph."
-  echo "Use the ralph skill to convert a PRD to the required format."
   exit 1
 fi
 
@@ -62,28 +61,44 @@ fi
 
 echo "Starting Ralph - Max iterations: $MAX_ITERATIONS"
 
-for i in $(seq 1 $MAX_ITERATIONS); do
+i=0
+while [ $i -lt $MAX_ITERATIONS ]; do
+  i=$((i + 1))
+  
+  # Get progress
+  TOTAL_COUNT=$(jq '[.userStories[]] | length' "$PRD_FILE" 2>/dev/null || echo "0")
+  COMPLETE_COUNT=$(jq '[.userStories[] | select(.passes == true)] | length' "$PRD_FILE" 2>/dev/null || echo "0")
+  
+  if [ "$TOTAL_COUNT" -gt 0 ]; then
+    PERCENT=$((COMPLETE_COUNT * 100 / TOTAL_COUNT))
+  else
+    PERCENT=0
+  fi
+  
+  # Show progress
   echo ""
   echo "═══════════════════════════════════════════════════════"
   echo "  Ralph Iteration $i of $MAX_ITERATIONS"
+  echo "  Progress: $COMPLETE_COUNT/$TOTAL_COUNT stories complete ($PERCENT%)"
   echo "═══════════════════════════════════════════════════════"
+  
+  # Exit if no stories found
+  if [ "$TOTAL_COUNT" -eq 0 ]; then
+    echo ""
+    echo "Error: No stories found in prd.json"
+    exit 1
+  fi
+  
+  # Exit if all complete
+  if [ "$COMPLETE_COUNT" = "$TOTAL_COUNT" ]; then
+    echo ""
+    echo "Ralph completed all tasks!"
+    exit 0
+  fi
   
   # Run opencode with the ralph prompt
   opencode run --model "github-copilot/claude-opus-4.5" --agent Build --file "$SCRIPT_DIR/prompt.md" "Execute the next story" || true
   
-  # Check if all stories in prd.json are complete
-  if [ -f "$PRD_FILE" ]; then
-    INCOMPLETE_COUNT=$(jq '[.userStories[] | select(.passes == false)] | length' "$PRD_FILE" 2>/dev/null || echo "1")
-    if [ "$INCOMPLETE_COUNT" = "0" ]; then
-      echo ""
-      echo "Ralph completed all tasks!"
-      echo "All stories in prd.json have passes: true"
-      echo "Completed at iteration $i of $MAX_ITERATIONS"
-      exit 0
-    fi
-  fi
-  
-  echo "Iteration $i complete. Continuing..."
   sleep 2
 done
 

@@ -19,7 +19,6 @@ $LastBranchFile = Join-Path $TasksDir ".last-branch"
 if (-not (Test-Path $PrdFile)) {
     Write-Host "Error: $PrdFile not found."
     Write-Host "Create a prd.json file in the tasks/ directory before running Ralph."
-    Write-Host "Use the ralph skill to convert a PRD to the required format."
     exit 1
 }
 
@@ -81,12 +80,48 @@ if (-not (Test-Path $ProgressFile)) {
 
 Write-Host "Starting Ralph - Max iterations: $MaxIterations"
 
-for ($i = 1; $i -le $MaxIterations; $i++) {
+$i = 0
+while ($i -lt $MaxIterations) {
+    $i++
+    
+    # Get progress
+    try {
+        $prdContent = Get-Content $PrdFile -Raw | ConvertFrom-Json
+        $totalCount = @($prdContent.userStories).Count
+        $completeCount = @($prdContent.userStories | Where-Object { $_.passes -eq $true }).Count
+        
+        if ($totalCount -gt 0) {
+            $percent = [math]::Floor($completeCount * 100 / $totalCount)
+        } else {
+            $percent = 0
+        }
+    } catch {
+        $totalCount = 0
+        $completeCount = 0
+        $percent = 0
+    }
+    
+    # Show progress
     Write-Host ""
     Write-Host "═══════════════════════════════════════════════════════"
     Write-Host "  Ralph Iteration $i of $MaxIterations"
+    Write-Host "  Progress: $completeCount/$totalCount stories complete ($percent%)"
     Write-Host "═══════════════════════════════════════════════════════"
-
+    
+    # Exit if no stories found
+    if ($totalCount -eq 0) {
+        Write-Host ""
+        Write-Host "Error: No stories found in prd.json"
+        exit 1
+    }
+    
+    # Exit if all complete
+    if ($completeCount -eq $totalCount) {
+        Write-Host ""
+        Write-Host "Ralph completed all tasks!"
+        exit 0
+    }
+    
     # Run opencode with the ralph prompt
     $PromptPath = Join-Path $ScriptDir "prompt.md"
     try {
@@ -94,25 +129,7 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
     } catch {
         # Continue even if opencode fails
     }
-
-    # Check if all stories in prd.json are complete
-    if (Test-Path $PrdFile) {
-        try {
-            $prdContent = Get-Content $PrdFile -Raw | ConvertFrom-Json
-            $incompleteStories = $prdContent.userStories | Where-Object { $_.passes -eq $false }
-            if ($null -eq $incompleteStories -or @($incompleteStories).Count -eq 0) {
-                Write-Host ""
-                Write-Host "Ralph completed all tasks!"
-                Write-Host "All stories in prd.json have passes: true"
-                Write-Host "Completed at iteration $i of $MaxIterations"
-                exit 0
-            }
-        } catch {
-            # Continue if JSON parsing fails
-        }
-    }
-
-    Write-Host "Iteration $i complete. Continuing..."
+    
     Start-Sleep -Seconds 2
 }
 
