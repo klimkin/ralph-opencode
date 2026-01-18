@@ -6,10 +6,19 @@ set -e
 
 MAX_ITERATIONS=${1:-10}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PRD_FILE="$SCRIPT_DIR/prd.json"
-PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
-ARCHIVE_DIR="$SCRIPT_DIR/archive"
-LAST_BRANCH_FILE="$SCRIPT_DIR/.last-branch"
+TASKS_DIR="$SCRIPT_DIR/tasks"
+PRD_FILE="$TASKS_DIR/prd.json"
+PROGRESS_FILE="$TASKS_DIR/progress.txt"
+ARCHIVE_DIR="$TASKS_DIR/archive"
+LAST_BRANCH_FILE="$TASKS_DIR/.last-branch"
+
+# Check if prd.json exists
+if [ ! -f "$PRD_FILE" ]; then
+  echo "Error: $PRD_FILE not found."
+  echo "Create a prd.json file in the tasks/ directory before running Ralph."
+  echo "Use the ralph skill to convert a PRD to the required format."
+  exit 1
+fi
 
 # Archive previous run if branch changed
 if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
@@ -60,14 +69,18 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   echo "═══════════════════════════════════════════════════════"
   
   # Run opencode with the ralph prompt
-  OUTPUT=$(opencode run --model "github-copilot/claude-opus-4.5" --agent Build "Follow instructions in $SCRIPT_DIR/prompt.md" 2>&1 | tee /dev/stderr) || true
+  opencode run --model "github-copilot/claude-opus-4.5" --agent Build "Follow instructions in $SCRIPT_DIR/prompt.md" || true
   
-  # Check for completion signal
-  if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
-    echo ""
-    echo "Ralph completed all tasks!"
-    echo "Completed at iteration $i of $MAX_ITERATIONS"
-    exit 0
+  # Check if all stories in prd.json are complete
+  if [ -f "$PRD_FILE" ]; then
+    INCOMPLETE_COUNT=$(jq '[.userStories[] | select(.passes == false)] | length' "$PRD_FILE" 2>/dev/null || echo "1")
+    if [ "$INCOMPLETE_COUNT" = "0" ]; then
+      echo ""
+      echo "Ralph completed all tasks!"
+      echo "All stories in prd.json have passes: true"
+      echo "Completed at iteration $i of $MAX_ITERATIONS"
+      exit 0
+    fi
   fi
   
   echo "Iteration $i complete. Continuing..."

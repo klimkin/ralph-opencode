@@ -4,20 +4,20 @@ You are an autonomous coding agent working on a software project.
 
 ## Your Task
 
-1. Read the PRD at `prd.json` (in the same directory as this file)
-2. Read the progress log at `progress.txt` (check Codebase Patterns section first)
+1. Read the PRD at `./tasks/prd.json`
+2. Read the progress log at `./tasks/progress.txt` (check Codebase Patterns section first)
 3. Check you're on the correct branch from PRD `branchName`. If not, check it out or create from main.
 4. Pick the **highest priority** user story where `passes: false`
 5. Implement that single user story
 6. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
 7. Update AGENTS.md files if you discover reusable patterns (see below)
 8. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
-9. Update the PRD to set `passes: true` for the completed story
-10. Append your progress to `progress.txt`
+9. Update `./tasks/prd.json` to set `passes: true` for the completed story
+10. Append your progress to `./tasks/progress.txt`
 
 ## Progress Report Format
 
-APPEND to progress.txt (never replace, always append):
+APPEND to `./tasks/progress.txt` (never replace, always append):
 ```
 ## [Date/Time] - [Story ID]
 Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
@@ -36,7 +36,7 @@ The learnings section is critical - it helps future iterations avoid repeating m
 
 ## Consolidate Patterns
 
-If you discover a **reusable pattern** that future iterations should know, add it to the `## Codebase Patterns` section at the TOP of progress.txt (create it if it doesn't exist). This section should consolidate the most important learnings:
+If you discover a **reusable pattern** that future iterations should know, add it to the `## Codebase Patterns` section at the TOP of `./tasks/progress.txt` (create it if it doesn't exist). This section should consolidate the most important learnings:
 
 ```
 ## Codebase Patterns
@@ -93,16 +93,16 @@ A frontend story is NOT complete until browser verification passes.
 
 ## Stop Condition
 
-After completing a user story, check if ALL stories have `passes: true`.
+After completing a user story:
+1. Update the story's `passes` field to `true` in `./tasks/prd.json`
+2. Append your progress to `./tasks/progress.txt`
+3. End your response
 
-If ALL stories are complete and passing, reply with:
-<promise>COMPLETE</promise>
-
-If there are still stories with `passes: false`, end your response normally (another iteration will pick up the next story).
+The external loop will check `./tasks/prd.json` to determine if all stories are complete.
 
 ## Important
 
 - Work on ONE story per iteration
 - Commit frequently
 - Keep CI green
-- Read the Codebase Patterns section in progress.txt before starting
+- Read the Codebase Patterns section in `./tasks/progress.txt` before starting
