@@ -12,13 +12,6 @@ PROGRESS_FILE="$TASKS_DIR/progress.txt"
 ARCHIVE_DIR="$TASKS_DIR/archive"
 LAST_BRANCH_FILE="$TASKS_DIR/.last-branch"
 
-# Check if prd.json exists
-if [ ! -f "$PRD_FILE" ]; then
-  echo "Error: $PRD_FILE not found."
-  echo "Create a prd.json file in the tasks/ directory before running Ralph."
-  exit 1
-fi
-
 # Archive previous run if branch changed
 if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
   CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
@@ -50,6 +43,13 @@ if [ -f "$PRD_FILE" ]; then
   if [ -n "$CURRENT_BRANCH" ]; then
     echo "$CURRENT_BRANCH" > "$LAST_BRANCH_FILE"
   fi
+fi
+
+# Check if prd.json exists
+if [ ! -f "$PRD_FILE" ]; then
+  echo "Error: $PRD_FILE not found."
+  echo "Create a prd.json file in the tasks/ directory before running Ralph."
+  exit 1
 fi
 
 # Initialize progress file if it doesn't exist

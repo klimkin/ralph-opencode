@@ -15,13 +15,6 @@ $ProgressFile = Join-Path $TasksDir "progress.txt"
 $ArchiveDir = Join-Path $TasksDir "archive"
 $LastBranchFile = Join-Path $TasksDir ".last-branch"
 
-# Check if prd.json exists
-if (-not (Test-Path $PrdFile)) {
-    Write-Host "Error: $PrdFile not found."
-    Write-Host "Create a prd.json file in the tasks/ directory before running Ralph."
-    exit 1
-}
-
 # Archive previous run if branch changed
 if ((Test-Path $PrdFile) -and (Test-Path $LastBranchFile)) {
     try {
@@ -67,6 +60,13 @@ if (Test-Path $PrdFile) {
     } catch {
         # Ignore JSON parsing errors
     }
+}
+
+# Check if prd.json exists
+if (-not (Test-Path $PrdFile)) {
+    Write-Host "Error: $PrdFile not found."
+    Write-Host "Create a prd.json file in the tasks/ directory before running Ralph."
+    exit 1
 }
 
 # Initialize progress file if it doesn't exist
