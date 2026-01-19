@@ -1,35 +1,193 @@
 #Requires -Version 7.0
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.ps1 [max_iterations] [tool]
+# Usage: ./ralph.ps1 [options] [-MaxIterations <n>] [-Tool <tool>]
 # Tools: amp, opencode, claude (default: opencode)
 # Can also use RALPH_TOOL env var
+#
+# Options:
+#   -AutoApprove      Skip all permission prompts (use with caution)
+#   -DryRun           Show what would be executed without running
+#   -Help             Show this help message
 
 param(
     [int]$MaxIterations = 10,
-    [string]$Tool = ""
+    [string]$Tool = "",
+    [switch]$AutoApprove,
+    [switch]$DryRun,
+    [switch]$Help
 )
 
 $ErrorActionPreference = "Stop"
 
-# Determine tool: param > env var > default
-if ([string]::IsNullOrEmpty($Tool)) {
-    $Tool = $env:RALPH_TOOL
-    if ([string]::IsNullOrEmpty($Tool)) {
-        $Tool = "opencode"
+# =============================================================================
+# Helper Functions
+# =============================================================================
+
+function Show-Help {
+    @"
+Ralph Wiggum - Long-running AI agent loop
+
+Usage: ./ralph.ps1 [options] [-MaxIterations <n>] [-Tool <tool>]
+
+Options:
+  -AutoApprove      Skip all permission prompts (use with caution)
+  -DryRun           Show what would be executed without running
+  -Help             Show this help message
+
+Arguments:
+  -MaxIterations    Maximum number of iterations (default: 10)
+  -Tool             AI tool to use: amp, opencode, claude (default: opencode)
+
+Environment variables:
+  RALPH_TOOL          Default tool to use
+  RALPH_AUTO_APPROVE  Set to 'true' to enable auto-approve
+"@
+}
+
+function Initialize-ProgressFile {
+    @(
+        "# Ralph Progress Log",
+        "Started: $(Get-Date)",
+        "---"
+    ) | Set-Content $script:ProgressFile
+}
+
+function Get-StoryById {
+    param([string]$StoryId, $PrdContent)
+    $PrdContent.userStories | Where-Object { $_.id -eq $StoryId }
+}
+
+function Test-Dependencies {
+    param([string]$StoryId, $PrdContent)
+
+    $story = Get-StoryById -StoryId $StoryId -PrdContent $PrdContent
+    if (-not $story.dependsOn -or $story.dependsOn.Count -eq 0) {
+        return $true
+    }
+
+    foreach ($depId in $story.dependsOn) {
+        $depStory = Get-StoryById -StoryId $depId -PrdContent $PrdContent
+        if (-not $depStory -or $depStory.passes -ne $true) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Get-NextStory {
+    param($PrdContent)
+
+    $PrdContent.userStories |
+        Where-Object { $_.passes -ne $true } |
+        Sort-Object priority |
+        Where-Object { Test-Dependencies -StoryId $_.id -PrdContent $PrdContent } |
+        Select-Object -First 1
+}
+
+function Get-PendingDeps {
+    param([string]$StoryId, $PrdContent)
+
+    $story = Get-StoryById -StoryId $StoryId -PrdContent $PrdContent
+    if (-not $story.dependsOn -or $story.dependsOn.Count -eq 0) {
+        return @()
+    }
+
+    $story.dependsOn | Where-Object {
+        $depStory = Get-StoryById -StoryId $_ -PrdContent $PrdContent
+        -not $depStory -or $depStory.passes -ne $true
     }
 }
 
-# Validate tool selection
-switch ($Tool) {
-    "amp" { }
-    "opencode" { }
-    "claude" { }
-    default {
-        Write-Host "Error: Unknown tool '$Tool'"
-        Write-Host "Valid options: amp, opencode, claude"
-        exit 1
+function Build-Command {
+    param([string]$ToolName, [string]$StoryId, [string]$StoryTitle)
+
+    $task = "Execute story ${StoryId}: $StoryTitle"
+
+    switch ($ToolName) {
+        "amp" {
+            "Get-Content `"$script:PromptFile`" -Raw | amp --dangerously-allow-all `"$task`""
+        }
+        "opencode" {
+            $prefix = if ($script:AutoApprove) { "[with OPENCODE_PERMISSION='`"allow`"'] " } else { "" }
+            "${prefix}opencode run --model github-copilot/claude-opus-4.5 --agent build `"$task`" --file `"$script:PromptFile`""
+        }
+        "claude" {
+            $flags = if ($script:AutoApprove) { "--dangerously-skip-permissions " } else { "" }
+            "Get-Content `"$script:PromptFile`" -Raw | claude -p ${flags}`"$task`""
+        }
     }
 }
+
+function Invoke-Tool {
+    param([string]$ToolName, [string]$StoryId, [string]$StoryTitle)
+
+    $task = "Execute story ${StoryId}: $StoryTitle"
+
+    switch ($ToolName) {
+        "amp" {
+            Get-Content $script:PromptFile -Raw | amp --dangerously-allow-all $task
+        }
+        "opencode" {
+            if ($script:AutoApprove) {
+                $env:OPENCODE_PERMISSION = '"allow"'
+            }
+            opencode run --model github-copilot/claude-opus-4.5 --agent build $task --file $script:PromptFile
+        }
+        "claude" {
+            if ($script:AutoApprove) {
+                Get-Content $script:PromptFile -Raw | claude -p --dangerously-skip-permissions $task
+            } else {
+                Get-Content $script:PromptFile -Raw | claude -p $task
+            }
+        }
+    }
+}
+
+function Show-BlockedStories {
+    param($PrdContent)
+
+    Write-Host "Remaining stories and their pending dependencies:"
+    $PrdContent.userStories | Where-Object { $_.passes -ne $true } | ForEach-Object {
+        $pending = Get-PendingDeps -StoryId $_.id -PrdContent $PrdContent
+        $pendingStr = if ($pending.Count -gt 0) { $pending -join ", " } else { "none" }
+        Write-Host "  - $($_.id) ($($_.title)): waiting on [$pendingStr]"
+    }
+}
+
+function Get-Progress {
+    param($PrdContent)
+
+    $total = @($PrdContent.userStories).Count
+    $complete = @($PrdContent.userStories | Where-Object { $_.passes -eq $true }).Count
+    $percent = if ($total -gt 0) { [math]::Floor($complete * 100 / $total) } else { 0 }
+
+    @{ Total = $total; Complete = $complete; Percent = $percent }
+}
+
+# =============================================================================
+# Argument Processing
+# =============================================================================
+
+if ($Help) {
+    Show-Help
+    exit 0
+}
+
+if ($env:RALPH_AUTO_APPROVE -eq "true") { $AutoApprove = $true }
+
+if ([string]::IsNullOrEmpty($Tool)) {
+    $Tool = if ($env:RALPH_TOOL) { $env:RALPH_TOOL } else { "opencode" }
+}
+
+if ($Tool -notin @("amp", "opencode", "claude")) {
+    Write-Host "Error: Unknown tool '$Tool'"
+    Write-Host "Valid options: amp, opencode, claude"
+    exit 1
+}
+
+# =============================================================================
+# Path Setup
+# =============================================================================
 
 $ScriptDir = $PSScriptRoot
 $TasksDir = Join-Path (Get-Location) "tasks"
@@ -39,37 +197,30 @@ $ArchiveDir = Join-Path $TasksDir "archive"
 $LastBranchFile = Join-Path $TasksDir ".last-branch"
 $PromptFile = Join-Path $ScriptDir "prompt.md"
 
-# Archive previous run if branch changed
+# =============================================================================
+# Archive Previous Run (if branch changed)
+# =============================================================================
+
 if ((Test-Path $PrdFile) -and (Test-Path $LastBranchFile)) {
     try {
         $prdContent = Get-Content $PrdFile -Raw | ConvertFrom-Json
         $CurrentBranch = $prdContent.branchName
+        $LastBranch = (Get-Content $LastBranchFile -Raw -ErrorAction SilentlyContinue)?.Trim()
+
+        if ($CurrentBranch -and $LastBranch -and ($CurrentBranch -ne $LastBranch)) {
+            $FolderName = $LastBranch -replace '^ralph/', ''
+            $ArchiveFolder = Join-Path $ArchiveDir "$(Get-Date -Format 'yyyy-MM-dd')-$FolderName"
+
+            Write-Host "Archiving previous run: $LastBranch"
+            New-Item -ItemType Directory -Path $ArchiveFolder -Force | Out-Null
+            if (Test-Path $PrdFile) { Copy-Item $PrdFile $ArchiveFolder }
+            if (Test-Path $ProgressFile) { Copy-Item $ProgressFile $ArchiveFolder }
+            Write-Host "   Archived to: $ArchiveFolder"
+
+            Initialize-ProgressFile
+        }
     } catch {
-        $CurrentBranch = $null
-    }
-
-    $LastBranch = Get-Content $LastBranchFile -Raw -ErrorAction SilentlyContinue
-    if ($LastBranch) { $LastBranch = $LastBranch.Trim() }
-
-    if ($CurrentBranch -and $LastBranch -and ($CurrentBranch -ne $LastBranch)) {
-        # Archive the previous run
-        $Date = Get-Date -Format "yyyy-MM-dd"
-        # Strip "ralph/" prefix from branch name for folder
-        $FolderName = $LastBranch -replace '^ralph/', ''
-        $ArchiveFolder = Join-Path $ArchiveDir "$Date-$FolderName"
-
-        Write-Host "Archiving previous run: $LastBranch"
-        New-Item -ItemType Directory -Path $ArchiveFolder -Force | Out-Null
-        if (Test-Path $PrdFile) { Copy-Item $PrdFile $ArchiveFolder }
-        if (Test-Path $ProgressFile) { Copy-Item $ProgressFile $ArchiveFolder }
-        Write-Host "   Archived to: $ArchiveFolder"
-
-        # Reset progress file for new run
-        @(
-            "# Ralph Progress Log",
-            "Started: $(Get-Date)",
-            "---"
-        ) | Set-Content $ProgressFile
+        # Ignore errors during archive
     }
 }
 
@@ -77,100 +228,91 @@ if ((Test-Path $PrdFile) -and (Test-Path $LastBranchFile)) {
 if (Test-Path $PrdFile) {
     try {
         $prdContent = Get-Content $PrdFile -Raw | ConvertFrom-Json
-        $CurrentBranch = $prdContent.branchName
-        if ($CurrentBranch) {
-            $CurrentBranch | Set-Content $LastBranchFile
+        if ($prdContent.branchName) {
+            $prdContent.branchName | Set-Content $LastBranchFile
         }
     } catch {
         # Ignore JSON parsing errors
     }
 }
 
-# Check if prd.json exists
+# =============================================================================
+# Validation
+# =============================================================================
+
 if (-not (Test-Path $PrdFile)) {
     Write-Host "Error: $PrdFile not found."
     Write-Host "Create a prd.json file in the tasks/ directory before running Ralph."
     exit 1
 }
 
-# Initialize progress file if it doesn't exist
 if (-not (Test-Path $ProgressFile)) {
-    @(
-        "# Ralph Progress Log",
-        "Started: $(Get-Date)",
-        "---"
-    ) | Set-Content $ProgressFile
+    Initialize-ProgressFile
 }
 
-Write-Host "Starting Ralph - Max iterations: $MaxIterations, Tool: $Tool"
+# =============================================================================
+# Main Loop
+# =============================================================================
 
-$i = 0
-while ($i -lt $MaxIterations) {
-    $i++
-    
-    # Get progress
+Write-Host "Starting Ralph - Max iterations: $MaxIterations, Tool: $Tool"
+if ($AutoApprove) { Write-Host "  Auto-approve: ENABLED (skipping permission prompts)" }
+if ($DryRun) { Write-Host "  Dry run: ENABLED (no commands will be executed)" }
+
+for ($i = 1; $i -le $MaxIterations; $i++) {
+    # Load PRD and get progress
     try {
         $prdContent = Get-Content $PrdFile -Raw | ConvertFrom-Json
-        $totalCount = @($prdContent.userStories).Count
-        $completeCount = @($prdContent.userStories | Where-Object { $_.passes -eq $true }).Count
-        
-        if ($totalCount -gt 0) {
-            $percent = [math]::Floor($completeCount * 100 / $totalCount)
-        } else {
-            $percent = 0
-        }
+        $progress = Get-Progress -PrdContent $prdContent
     } catch {
-        $totalCount = 0
-        $completeCount = 0
-        $percent = 0
+        $progress = @{ Total = 0; Complete = 0; Percent = 0 }
     }
-    
-    # Show progress
+
+    # Show progress header
     Write-Host ""
     Write-Host "═══════════════════════════════════════════════════════"
     Write-Host "  Ralph Iteration $i of $MaxIterations"
-    Write-Host "  Progress: $completeCount/$totalCount stories complete ($percent%)"
+    Write-Host "  Progress: $($progress.Complete)/$($progress.Total) stories complete ($($progress.Percent)%)"
     Write-Host "═══════════════════════════════════════════════════════"
-    
-    # Exit if no stories found
-    if ($totalCount -eq 0) {
-        Write-Host ""
-        Write-Host "Error: No stories found in prd.json"
+
+    # Exit conditions
+    if ($progress.Total -eq 0) {
+        Write-Host "`nError: No stories found in prd.json"
         exit 1
     }
-    
-    # Exit if all complete
-    if ($completeCount -eq $totalCount) {
-        Write-Host ""
-        Write-Host "Ralph completed all tasks!"
+
+    if ($progress.Complete -eq $progress.Total) {
+        Write-Host "`nRalph completed all tasks!"
         exit 0
     }
-    
-    # Pre-select the next story (lowest priority number first)
-    $nextStory = $prdContent.userStories | Where-Object { $_.passes -ne $true } | Sort-Object priority | Select-Object -First 1
-    $nextStoryId = $nextStory.id
-    $nextStoryTitle = $nextStory.title
-    
-    Write-Host "  Next story: $nextStoryId - $nextStoryTitle"
-    Write-Host "───────────────────────────────────────────────────────"
-    
-    # Run the selected tool with the ralph prompt, passing the specific story
-    try {
-        switch ($Tool) {
-            "amp" {
-                Get-Content $PromptFile -Raw | amp --dangerously-allow-all "Execute story ${nextStoryId}: $nextStoryTitle"
-            }
-            "opencode" {
-                opencode run --model github-copilot/claude-opus-4.5 --agent build "Execute story ${nextStoryId}: $nextStoryTitle" --file $PromptFile
-            }
-            "claude" {
-                Get-Content $PromptFile -Raw | claude -p "Execute story ${nextStoryId}: $nextStoryTitle"
-            }
-        }
-    } catch {
-        # Continue even if tool fails
+
+    # Get next eligible story
+    $nextStory = Get-NextStory -PrdContent $prdContent
+
+    if (-not $nextStory) {
+        Write-Host "`nError: No eligible stories found. Possible dependency cycle or unmet dependencies.`n"
+        Show-BlockedStories -PrdContent $prdContent
+        exit 1
     }
-    
+
+    Write-Host "  Next story: $($nextStory.id) - $($nextStory.title)"
+    Write-Host "───────────────────────────────────────────────────────"
+
+    # Build and execute command
+    $cmd = Build-Command -ToolName $Tool -StoryId $nextStory.id -StoryTitle $nextStory.title
+
+    if ($DryRun) {
+        Write-Host "[DRY RUN] Would execute:"
+        Write-Host "  $cmd"
+        Write-Host ""
+        Write-Host "[DRY RUN] After execution, would check if story $($nextStory.id) was marked as complete"
+    } else {
+        try {
+            Invoke-Tool -ToolName $Tool -StoryId $nextStory.id -StoryTitle $nextStory.title
+        } catch {
+            # Continue even if tool fails
+        }
+    }
+
     Start-Sleep -Seconds 2
 }
 
