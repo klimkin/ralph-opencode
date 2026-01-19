@@ -123,9 +123,17 @@ while ($i -lt $MaxIterations) {
         exit 0
     }
     
-    # Run opencode with the ralph prompt
+    # Pre-select the next story (lowest priority number first)
+    $nextStory = $prdContent.userStories | Where-Object { $_.passes -ne $true } | Sort-Object priority | Select-Object -First 1
+    $nextStoryId = $nextStory.id
+    $nextStoryTitle = $nextStory.title
+    
+    Write-Host "  Next story: $nextStoryId - $nextStoryTitle"
+    Write-Host "───────────────────────────────────────────────────────"
+    
+    # Run opencode with the ralph prompt, passing the specific story
     try {
-        opencode run --model github-copilot/claude-opus-4.5 --agent build "Execute the next story" --file $PromptFile
+        opencode run --model github-copilot/claude-opus-4.5 --agent build "Execute story ${nextStoryId}: $nextStoryTitle" --file $PromptFile
     } catch {
         # Continue even if opencode fails
     }

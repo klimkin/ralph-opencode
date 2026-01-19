@@ -97,8 +97,15 @@ while [ $i -lt $MAX_ITERATIONS ]; do
     exit 0
   fi
   
-  # Run opencode with the ralph prompt
-  opencode run --model github-copilot/claude-opus-4.5 --agent build "Execute the next story" --file "$PROMPT_FILE" || true
+  # Pre-select the next story (lowest priority number first)
+  NEXT_STORY_ID=$(jq -r '[.userStories[] | select(.passes != true)] | sort_by(.priority) | .[0].id' "$PRD_FILE")
+  NEXT_STORY_TITLE=$(jq -r '[.userStories[] | select(.passes != true)] | sort_by(.priority) | .[0].title' "$PRD_FILE")
+  
+  echo "  Next story: $NEXT_STORY_ID - $NEXT_STORY_TITLE"
+  echo "───────────────────────────────────────────────────────"
+  
+  # Run opencode with the ralph prompt, passing the specific story
+  opencode run --model github-copilot/claude-opus-4.5 --agent build "Execute story $NEXT_STORY_ID: $NEXT_STORY_TITLE" --file "$PROMPT_FILE" || true
   
   sleep 2
 done
