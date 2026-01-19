@@ -1,12 +1,35 @@
 #Requires -Version 7.0
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.ps1 [max_iterations]
+# Usage: ./ralph.ps1 [max_iterations] [tool]
+# Tools: amp, opencode, claude (default: opencode)
+# Can also use RALPH_TOOL env var
 
 param(
-    [int]$MaxIterations = 10
+    [int]$MaxIterations = 10,
+    [string]$Tool = ""
 )
 
 $ErrorActionPreference = "Stop"
+
+# Determine tool: param > env var > default
+if ([string]::IsNullOrEmpty($Tool)) {
+    $Tool = $env:RALPH_TOOL
+    if ([string]::IsNullOrEmpty($Tool)) {
+        $Tool = "opencode"
+    }
+}
+
+# Validate tool selection
+switch ($Tool) {
+    "amp" { }
+    "opencode" { }
+    "claude" { }
+    default {
+        Write-Host "Error: Unknown tool '$Tool'"
+        Write-Host "Valid options: amp, opencode, claude"
+        exit 1
+    }
+}
 
 $ScriptDir = $PSScriptRoot
 $TasksDir = Join-Path (Get-Location) "tasks"
@@ -79,7 +102,7 @@ if (-not (Test-Path $ProgressFile)) {
     ) | Set-Content $ProgressFile
 }
 
-Write-Host "Starting Ralph - Max iterations: $MaxIterations"
+Write-Host "Starting Ralph - Max iterations: $MaxIterations, Tool: $Tool"
 
 $i = 0
 while ($i -lt $MaxIterations) {
@@ -131,11 +154,21 @@ while ($i -lt $MaxIterations) {
     Write-Host "  Next story: $nextStoryId - $nextStoryTitle"
     Write-Host "───────────────────────────────────────────────────────"
     
-    # Run opencode with the ralph prompt, passing the specific story
+    # Run the selected tool with the ralph prompt, passing the specific story
     try {
-        opencode run --model github-copilot/claude-opus-4.5 --agent build "Execute story ${nextStoryId}: $nextStoryTitle" --file $PromptFile
+        switch ($Tool) {
+            "amp" {
+                Get-Content $PromptFile -Raw | amp --dangerously-allow-all "Execute story ${nextStoryId}: $nextStoryTitle"
+            }
+            "opencode" {
+                opencode run --model github-copilot/claude-opus-4.5 --agent build "Execute story ${nextStoryId}: $nextStoryTitle" --file $PromptFile
+            }
+            "claude" {
+                Get-Content $PromptFile -Raw | claude -p "Execute story ${nextStoryId}: $nextStoryTitle"
+            }
+        }
     } catch {
-        # Continue even if opencode fails
+        # Continue even if tool fails
     }
     
     Start-Sleep -Seconds 2

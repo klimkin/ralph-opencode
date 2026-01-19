@@ -2,7 +2,12 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs [Opencode](https://opencode.ai) repeatedly until all PRD items are complete. Each iteration is a fresh Opencode instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+Ralph is an autonomous AI agent loop that runs your preferred AI coding tool repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+
+Supports:
+- [Amp](https://ampcode.com) - [Documentation](https://ampcode.com/manual)
+- [Opencode](https://opencode.ai) - [Documentation](https://opencode.ai/docs)
+- [Claude Code](https://code.claude.com/) - [Documentation](https://code.claude.com/)
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
@@ -10,7 +15,10 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 ## Prerequisites
 
-- [Opencode CLI](https://opencode.ai) installed and authenticated
+- One of the supported CLI tools installed and authenticated:
+  - [Amp CLI](https://ampcode.com)
+  - [Opencode CLI](https://opencode.ai)
+  - [Claude Code CLI](https://code.claude.com/)
 - `jq` installed (`brew install jq` on macOS)
 - A git repository for your project
 
@@ -30,14 +38,23 @@ chmod +x scripts/ralph/ralph.sh
 
 ### Option 2: Install skills globally
 
-Copy the skills to your Opencode config for use across all projects:
+Copy the skills to your tool's config for use across all projects:
 
 ```bash
+# For Opencode
 cp -r skills/prd ~/.config/opencode/skills/
 cp -r skills/ralph ~/.config/opencode/skills/
+
+# For Amp
+cp -r skills/prd ~/.config/amp/skills/
+cp -r skills/ralph ~/.config/amp/skills/
+
+# For Claude Code
+cp -r skills/prd ~/.claude/skills/
+cp -r skills/ralph ~/.claude/skills/
 ```
 
-Or for project-local skills:
+Or for project-local skills (works with any tool):
 
 ```bash
 cp -r skills/prd .opencode/skills/
@@ -69,10 +86,19 @@ This creates `prd.json` with user stories structured for autonomous execution.
 ### 3. Run Ralph
 
 ```bash
+# Default (uses opencode)
 ./scripts/ralph/ralph.sh [max_iterations]
+
+# Or specify a tool
+./scripts/ralph/ralph.sh 10 amp
+./scripts/ralph/ralph.sh 10 opencode
+./scripts/ralph/ralph.sh 10 claude
+
+# Or use environment variable
+RALPH_TOOL=claude ./scripts/ralph/ralph.sh 10
 ```
 
-Default is 10 iterations.
+Default is 10 iterations with opencode.
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
@@ -88,8 +114,9 @@ Ralph will:
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh Opencode instances |
-| `prompt.md` | Instructions given to each Opencode instance |
+| `ralph.sh` | The bash loop that spawns fresh AI tool instances |
+| `ralph.ps1` | PowerShell version for Windows |
+| `prompt.md` | Instructions given to each AI tool instance |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
 | `progress.txt` | Append-only learnings for future iterations |
@@ -115,7 +142,7 @@ npm run dev
 
 ### Each Iteration = Fresh Context
 
-Each iteration spawns a **new Opencode instance** with clean context. The only memory between iterations is:
+Each iteration spawns a **new AI tool instance** with clean context. The only memory between iterations is:
 - Git history (commits from previous iterations)
 - `progress.txt` (learnings and context)
 - `prd.json` (which stories are done)
@@ -137,7 +164,7 @@ Too big (split these):
 
 ### AGENTS.md Updates Are Critical
 
-After each iteration, Ralph updates the relevant `AGENTS.md` files with learnings. This is key because Opencode automatically reads these files, so future iterations (and future human developers) benefit from discovered patterns, gotchas, and conventions.
+After each iteration, Ralph updates the relevant `AGENTS.md` files with learnings. This is key because AI tools automatically read these files, so future iterations (and future human developers) benefit from discovered patterns, gotchas, and conventions.
 
 Examples of what to add to AGENTS.md:
 - Patterns discovered ("this codebase uses X for Y")
@@ -188,4 +215,6 @@ Ralph automatically archives previous runs when you start a new feature (differe
 ## References
 
 - [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
+- [Amp documentation](https://ampcode.com/manual)
 - [Opencode documentation](https://opencode.ai/docs)
+- [Claude Code documentation](https://code.claude.com/)

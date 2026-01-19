@@ -2,7 +2,7 @@
 
 ## Overview
 
-Ralph is an autonomous AI agent loop that runs Opencode repeatedly until all PRD items are complete. Each iteration is a fresh Opencode instance with clean context.
+Ralph is an autonomous AI agent loop that runs your preferred AI coding tool (Amp, Opencode, or Claude Code) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context.
 
 ## Commands
 
@@ -14,13 +14,22 @@ cd flowchart && npm run dev
 cd flowchart && npm run build
 
 # Run Ralph (from your project that has prd.json)
-./ralph.sh [max_iterations]
+./ralph.sh [max_iterations] [tool]
+
+# Examples:
+./ralph.sh 10 amp      # Use Amp
+./ralph.sh 10 opencode # Use Opencode (default)
+./ralph.sh 10 claude   # Use Claude Code
+
+# Or via environment variable:
+RALPH_TOOL=claude ./ralph.sh 10
 ```
 
 ## Key Files
 
-- `ralph.sh` - The bash loop that spawns fresh Opencode instances
-- `prompt.md` - Instructions given to each Opencode instance
+- `ralph.sh` - The bash loop that spawns fresh AI tool instances
+- `ralph.ps1` - PowerShell version for Windows
+- `prompt.md` - Instructions given to each AI tool instance
 - `prd.json.example` - Example PRD format
 - `flowchart/` - Interactive React Flow diagram explaining how Ralph works
 
@@ -37,7 +46,7 @@ npm run dev
 
 ## Patterns
 
-- Each iteration spawns a fresh Opencode instance with clean context
+- Each iteration spawns a fresh AI tool instance with clean context
 - Memory persists via git history, `progress.txt`, and `prd.json`
 - Stories should be small enough to complete in one context window
 - Always update AGENTS.md with discovered patterns for future iterations

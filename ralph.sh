@@ -1,10 +1,13 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [max_iterations]
+# Usage: ./ralph.sh [max_iterations] [tool]
+# Tools: amp, opencode, claude (default: opencode)
+# Can also use RALPH_TOOL env var
 
 set -e
 
 MAX_ITERATIONS=${1:-10}
+TOOL="${2:-${RALPH_TOOL:-opencode}}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TASKS_DIR="$(pwd)/tasks"
 PRD_FILE="$TASKS_DIR/prd.json"
@@ -12,6 +15,17 @@ PROGRESS_FILE="$TASKS_DIR/progress.txt"
 ARCHIVE_DIR="$TASKS_DIR/archive"
 LAST_BRANCH_FILE="$TASKS_DIR/.last-branch"
 PROMPT_FILE="$SCRIPT_DIR/prompt.md"
+
+# Validate tool selection
+case "$TOOL" in
+  amp|opencode|claude)
+    ;;
+  *)
+    echo "Error: Unknown tool '$TOOL'"
+    echo "Valid options: amp, opencode, claude"
+    exit 1
+    ;;
+esac
 
 # Archive previous run if branch changed
 if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
@@ -60,7 +74,7 @@ if [ ! -f "$PROGRESS_FILE" ]; then
   echo "---" >> "$PROGRESS_FILE"
 fi
 
-echo "Starting Ralph - Max iterations: $MAX_ITERATIONS"
+echo "Starting Ralph - Max iterations: $MAX_ITERATIONS, Tool: $TOOL"
 
 i=0
 while [ $i -lt $MAX_ITERATIONS ]; do
@@ -104,8 +118,18 @@ while [ $i -lt $MAX_ITERATIONS ]; do
   echo "  Next story: $NEXT_STORY_ID - $NEXT_STORY_TITLE"
   echo "───────────────────────────────────────────────────────"
   
-  # Run opencode with the ralph prompt, passing the specific story
-  opencode run --model github-copilot/claude-opus-4.5 --agent build "Execute story $NEXT_STORY_ID: $NEXT_STORY_TITLE" --file "$PROMPT_FILE" || true
+  # Run the selected tool with the ralph prompt, passing the specific story
+  case "$TOOL" in
+    amp)
+      cat "$PROMPT_FILE" | amp --dangerously-allow-all "Execute story $NEXT_STORY_ID: $NEXT_STORY_TITLE" || true
+      ;;
+    opencode)
+      opencode run --model github-copilot/claude-opus-4.5 --agent build "Execute story $NEXT_STORY_ID: $NEXT_STORY_TITLE" --file "$PROMPT_FILE" || true
+      ;;
+    claude)
+      cat "$PROMPT_FILE" | claude -p "Execute story $NEXT_STORY_ID: $NEXT_STORY_TITLE" || true
+      ;;
+  esac
   
   sleep 2
 done
