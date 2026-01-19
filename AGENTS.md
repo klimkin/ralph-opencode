@@ -86,6 +86,31 @@ Ralph will:
 
 The `flowchart/` directory contains an interactive visualization built with React Flow. It's designed for presentations - click through to reveal each step with animations.
 
+### Flowchart Steps (11 total)
+
+| Step | Label | Description | Phase |
+|------|-------|-------------|-------|
+| 1 | You write a PRD | Define what you want to build | setup |
+| 2 | Convert to prd.json | Break into small user stories | setup |
+| 3 | Run ralph.sh | Starts the autonomous loop | setup |
+| 4 | Pick next story | By priority, check dependsOn | loop |
+| 5 | Deps satisfied? | All dependsOn stories pass | decision |
+| 6 | Implements it | Writes code, runs tests | loop |
+| 7 | Commits changes | If tests pass | loop |
+| 8 | Updates prd.json | Sets passes: true | loop |
+| 9 | Logs to progress.txt | Saves learnings | loop |
+| 10 | More stories? | Decision point | decision |
+| 11 | Done! | All stories complete | done |
+
+### Annotation Notes
+
+The flowchart includes 4 contextual notes that appear at specific steps:
+
+1. **prd.json example** (step 2) - Shows story structure with `dependsOn` field
+2. **CLI options** (step 3) - Documents `--auto-approve` and `--dry-run` flags
+3. **Dependency explanation** (step 5) - Explains how `dependsOn` ordering works
+4. **AGENTS.md updates** (step 9) - Notes about pattern discovery
+
 To run locally:
 ```bash
 cd flowchart

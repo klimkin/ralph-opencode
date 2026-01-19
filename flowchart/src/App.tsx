@@ -40,14 +40,15 @@ const allSteps: { id: string; label: string; description: string; phase: Phase }
   { id: '2', label: 'Convert to prd.json', description: 'Break into small user stories', phase: 'setup' },
   { id: '3', label: 'Run ralph.sh', description: 'Starts the autonomous loop', phase: 'setup' },
   // Loop phase
-  { id: '4', label: 'AI tool picks a story', description: 'Finds next passes: false', phase: 'loop' },
-  { id: '5', label: 'Implements it', description: 'Writes code, runs tests', phase: 'loop' },
-  { id: '6', label: 'Commits changes', description: 'If tests pass', phase: 'loop' },
-  { id: '7', label: 'Updates prd.json', description: 'Sets passes: true', phase: 'loop' },
-  { id: '8', label: 'Logs to progress.txt', description: 'Saves learnings', phase: 'loop' },
-  { id: '9', label: 'More stories?', description: '', phase: 'decision' },
+  { id: '4', label: 'Pick next story', description: 'By priority, check dependsOn', phase: 'loop' },
+  { id: '5', label: 'Deps satisfied?', description: 'All dependsOn stories pass', phase: 'decision' },
+  { id: '6', label: 'Implements it', description: 'Writes code, runs tests', phase: 'loop' },
+  { id: '7', label: 'Commits changes', description: 'If tests pass', phase: 'loop' },
+  { id: '8', label: 'Updates prd.json', description: 'Sets passes: true', phase: 'loop' },
+  { id: '9', label: 'Logs to progress.txt', description: 'Saves learnings', phase: 'loop' },
+  { id: '10', label: 'More stories?', description: '', phase: 'decision' },
   // Exit
-  { id: '10', label: 'Done!', description: 'All stories complete', phase: 'done' },
+  { id: '11', label: 'Done!', description: 'All stories complete', phase: 'done' },
 ];
 
 const notes = [
@@ -57,11 +58,11 @@ const notes = [
     position: { x: 340, y: 100 },
     color: { bg: '#f5f0ff', border: '#8b5cf6' },
     content: `{
-  "id": "US-001",
-  "title": "Add priority field to database",
+  "id": "US-002",
+  "title": "Display priority on cards",
+  "dependsOn": ["US-001"],
   "acceptanceCriteria": [
-    "Add priority column to tasks table",
-    "Generate and run migration",
+    "Show priority badge on task cards",
     "Typecheck passes"
   ],
   "passes": false
@@ -69,8 +70,28 @@ const notes = [
   },
   {
     id: 'note-2',
-    appearsWithStep: 8,
-    position: { x: 480, y: 620 },
+    appearsWithStep: 3,
+    position: { x: 340, y: 260 },
+    color: { bg: '#e8f5e9', border: '#4caf50' },
+    content: `CLI Options:
+--auto-approve  Skip permission prompts
+--dry-run       Preview without executing
+
+./ralph.sh --auto-approve 10 opencode`,
+  },
+  {
+    id: 'note-3',
+    appearsWithStep: 5,
+    position: { x: 340, y: 420 },
+    color: { bg: '#fff3e0', border: '#ff9800' },
+    content: `dependsOn ensures stories run
+in correct order. US-002 waits
+until US-001 passes: true`,
+  },
+  {
+    id: 'note-4',
+    appearsWithStep: 9,
+    position: { x: 480, y: 700 },
     color: { bg: '#fdf4f0', border: '#c97a50' },
     content: `Also updates AGENTS.md with
 patterns discovered, so future
@@ -125,15 +146,16 @@ const positions: { [key: string]: { x: number; y: number } } = {
   '1': { x: 20, y: 20 },
   '2': { x: 80, y: 130 },
   '3': { x: 60, y: 250 },
-  // Loop
+  // Loop - with dependency check
   '4': { x: 40, y: 420 },
-  '5': { x: 450, y: 300 },
-  '6': { x: 750, y: 450 },
-  '7': { x: 470, y: 520 },
-  '8': { x: 200, y: 620 },
-  '9': { x: 40, y: 720 },
+  '5': { x: 280, y: 420 },  // Deps satisfied? decision
+  '6': { x: 520, y: 420 },  // Implements it
+  '7': { x: 750, y: 520 },  // Commits changes
+  '8': { x: 520, y: 620 },  // Updates prd.json
+  '9': { x: 250, y: 700 },  // Logs to progress.txt
+  '10': { x: 40, y: 800 },  // More stories?
   // Exit
-  '10': { x: 350, y: 880 },
+  '11': { x: 350, y: 940 },
   // Notes
   ...Object.fromEntries(notes.map(n => [n.id, n.position])),
 };
@@ -143,15 +165,17 @@ const edgeConnections: { source: string; target: string; sourceHandle?: string; 
   { source: '1', target: '2', sourceHandle: 'bottom', targetHandle: 'top' },
   { source: '2', target: '3', sourceHandle: 'bottom', targetHandle: 'top' },
   { source: '3', target: '4', sourceHandle: 'bottom', targetHandle: 'top' },
-  // Loop phase
+  // Loop phase with dependency check
   { source: '4', target: '5', sourceHandle: 'right', targetHandle: 'left' },
-  { source: '5', target: '6', sourceHandle: 'right', targetHandle: 'top' },
-  { source: '6', target: '7', sourceHandle: 'left-source', targetHandle: 'right-target' },
+  { source: '5', target: '6', sourceHandle: 'right', targetHandle: 'left', label: 'Yes' },
+  { source: '5', target: '10', sourceHandle: 'bottom', targetHandle: 'top', label: 'No (blocked)' },
+  { source: '6', target: '7', sourceHandle: 'right', targetHandle: 'top' },
   { source: '7', target: '8', sourceHandle: 'left-source', targetHandle: 'right-target' },
   { source: '8', target: '9', sourceHandle: 'left-source', targetHandle: 'right-target' },
-  { source: '9', target: '4', sourceHandle: 'top-source', targetHandle: 'bottom-target', label: 'Yes' },
+  { source: '9', target: '10', sourceHandle: 'left-source', targetHandle: 'right-target' },
+  { source: '10', target: '4', sourceHandle: 'top-source', targetHandle: 'bottom-target', label: 'Yes' },
   // Exit
-  { source: '9', target: '10', sourceHandle: 'bottom', targetHandle: 'top', label: 'No' },
+  { source: '10', target: '11', sourceHandle: 'bottom', targetHandle: 'top', label: 'No' },
 ];
 
 function createNode(step: typeof allSteps[0], visible: boolean, position?: { x: number; y: number }): Node {
