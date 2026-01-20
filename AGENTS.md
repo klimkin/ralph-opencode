@@ -39,6 +39,35 @@ RALPH_AUTO_APPROVE=true ./ralph.sh 10
 | `--dry-run` | - | Show what would be executed without running |
 | `--help` | - | Show help message |
 
+## Repository Structure
+
+```
+ralph-opencode/
+├── AGENTS.md              # This file - agent instructions
+├── README.md              # Project documentation
+├── ralph.sh               # Main bash loop script
+├── ralph.ps1              # PowerShell version for Windows
+├── prompt.md              # Instructions given to each AI tool instance
+├── prd.json.example       # Example PRD format with dependency support
+├── ralph-flowchart.png    # Static flowchart image
+├── ralph.webp             # Ralph logo/mascot
+├── flowchart/             # Interactive React Flow visualization
+│   ├── src/
+│   │   ├── App.tsx        # Main flowchart component (11 steps, 4 notes)
+│   │   ├── App.css        # Flowchart styles
+│   │   └── main.tsx       # React entry point
+│   ├── package.json       # Uses React 19, @xyflow/react, Vite 7, TypeScript 5.9
+│   └── vite.config.ts     # Vite configuration
+├── skills/                # Skills for AI tools (Opencode/Amp/Claude)
+│   ├── prd/
+│   │   └── SKILL.md       # PRD generator skill - creates tasks/prd-*.md files
+│   └── ralph/
+│       └── SKILL.md       # PRD-to-JSON converter skill - creates tasks/prd.json
+└── .github/
+    └── workflows/
+        └── deploy.yml     # GitHub Pages deployment for flowchart (Node 20)
+```
+
 ## Key Files
 
 - `ralph.sh` - The bash loop that spawns fresh AI tool instances
@@ -86,6 +115,12 @@ Ralph will:
 
 The `flowchart/` directory contains an interactive visualization built with React Flow. It's designed for presentations - click through to reveal each step with animations.
 
+### Tech Stack
+- **React 19** with TypeScript 5.9
+- **@xyflow/react** (v12) for the flowchart
+- **Vite 7** for bundling
+- Deployed to GitHub Pages via `.github/workflows/deploy.yml`
+
 ### Flowchart Steps (11 total)
 
 | Step | Label | Description | Phase |
@@ -118,6 +153,22 @@ npm install
 npm run dev
 ```
 
+## Skills
+
+Two skills are provided for AI tools:
+
+### PRD Skill (`skills/prd/SKILL.md`)
+- Triggers on: "create a prd", "write prd for", "plan this feature"
+- Asks 3-5 clarifying questions with lettered options
+- Outputs: `tasks/prd-[feature-name].md`
+- Always include "Verify in browser using dev-browser skill" for UI stories
+
+### Ralph Skill (`skills/ralph/SKILL.md`)
+- Triggers on: "convert this prd", "create prd.json from this"
+- Converts markdown PRD to JSON format
+- Outputs: `tasks/prd.json`
+- Archives previous runs when branchName changes
+
 ## Patterns
 
 - Each iteration spawns a fresh AI tool instance with clean context
@@ -126,6 +177,8 @@ npm run dev
 - Always update AGENTS.md with discovered patterns for future iterations
 - Use `dependsOn` to ensure database/API changes happen before UI changes
 - Use `--dry-run` to verify story execution order before running
+- The `tasks/` directory structure: `prd.json`, `progress.txt`, `archive/`
+- OpenCode uses `--model github-copilot/claude-opus-4.5 --agent build` by default
 
 ## Auto-Approve Mode
 
