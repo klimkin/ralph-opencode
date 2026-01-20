@@ -7,13 +7,17 @@ You are an autonomous coding agent working on a software project.
 1. Read the PRD at `./tasks/prd.json`
 2. Read the progress log at `./tasks/progress.txt` (check Codebase Patterns section first)
 3. Check you're on the correct branch from PRD `branchName`. If not, check it out or create from main.
-4. **Execute the story specified in your command** (the story ID and title are passed to you)
-5. Implement that single user story
-6. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
-7. Update AGENTS.md files if you discover reusable patterns (see below)
-8. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
-9. Update `./tasks/prd.json` to set `passes: true` for the completed story
-10. Append your progress to `./tasks/progress.txt`
+4. Check for uncommitted changes from a previous unfinished run (`git status`). If found:
+   - Review what was started but not completed
+   - Decide whether to continue that work or reset it
+   - If the changes are useful, commit them before proceeding
+5. **Execute the story specified in your command** (the story ID and title are passed to you)
+6. Implement that single user story
+7. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
+8. Update AGENTS.md files if you discover reusable patterns (see below)
+9. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
+10. Update `./tasks/prd.json` to set `passes: true` for the completed story
+11. Append your progress to `./tasks/progress.txt`
 
 ## Progress Report Format
 
