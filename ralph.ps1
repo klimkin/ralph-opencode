@@ -1,18 +1,16 @@
 #Requires -Version 7.0
 # Ralph Wiggum - Long-running AI agent loop
 # Usage: ./ralph.ps1 [options] [-MaxIterations <n>] [-Tool <tool>]
-# Tools: amp, opencode, claude (default: opencode)
+# Tools: amp, opencode, claude, copilot (default: opencode)
 # Can also use RALPH_TOOL env var
 #
 # Options:
-#   -AutoApprove      Skip all permission prompts (use with caution)
 #   -DryRun           Show what would be executed without running
 #   -Help             Show this help message
 
 param(
     [int]$MaxIterations = 10,
     [string]$Tool = "",
-    [switch]$AutoApprove,
     [switch]$DryRun,
     [switch]$Help
 )
@@ -30,17 +28,15 @@ Ralph Wiggum - Long-running AI agent loop
 Usage: ./ralph.ps1 [options] [-MaxIterations <n>] [-Tool <tool>]
 
 Options:
-  -AutoApprove      Skip all permission prompts (use with caution)
   -DryRun           Show what would be executed without running
   -Help             Show this help message
 
 Arguments:
   -MaxIterations    Maximum number of iterations (default: 10)
-  -Tool             AI tool to use: amp, opencode, claude (default: opencode)
+  -Tool             AI tool to use: amp, opencode, claude, copilot (default: opencode)
 
 Environment variables:
   RALPH_TOOL          Default tool to use
-  RALPH_AUTO_APPROVE  Set to 'true' to enable auto-approve
 "@
 }
 
@@ -108,12 +104,13 @@ function Build-Command {
             "Get-Content `"$script:PromptFile`" -Raw | amp --dangerously-allow-all `"$task`""
         }
         "opencode" {
-            $prefix = if ($script:AutoApprove) { "[with OPENCODE_PERMISSION='`"allow`"'] " } else { "" }
-            "${prefix}opencode run --model github-copilot/claude-opus-4.5 --agent build `"$task`" --file `"$script:PromptFile`""
+            "[with OPENCODE_PERMISSION='`"allow`"'] opencode run --model github-copilot/claude-opus-4.5 --agent build `"$task`" --file `"$script:PromptFile`""
         }
         "claude" {
-            $flags = if ($script:AutoApprove) { "--dangerously-skip-permissions " } else { "" }
-            "Get-Content `"$script:PromptFile`" -Raw | claude -p ${flags}`"$task`""
+            "Get-Content `"$script:PromptFile`" -Raw | claude -p --dangerously-skip-permissions `"$task`""
+        }
+        "copilot" {
+            "Get-Content `"$script:PromptFile`" -Raw | copilot -p --add-dir `"$(Get-Location)`" --allow-all `"$task`""
         }
     }
 }
@@ -128,17 +125,14 @@ function Invoke-Tool {
             Get-Content $script:PromptFile -Raw | amp --dangerously-allow-all $task
         }
         "opencode" {
-            if ($script:AutoApprove) {
-                $env:OPENCODE_PERMISSION = '"allow"'
-            }
+            $env:OPENCODE_PERMISSION = '"allow"'
             opencode run --model github-copilot/claude-opus-4.5 --agent build $task --file $script:PromptFile
         }
         "claude" {
-            if ($script:AutoApprove) {
-                Get-Content $script:PromptFile -Raw | claude -p --dangerously-skip-permissions $task
-            } else {
-                Get-Content $script:PromptFile -Raw | claude -p $task
-            }
+            Get-Content $script:PromptFile -Raw | claude -p --dangerously-skip-permissions $task
+        }
+        "copilot" {
+            Get-Content $script:PromptFile -Raw | copilot -p --add-dir (Get-Location) --allow-all $task
         }
     }
 }
@@ -173,15 +167,13 @@ if ($Help) {
     exit 0
 }
 
-if ($env:RALPH_AUTO_APPROVE -eq "true") { $AutoApprove = $true }
-
 if ([string]::IsNullOrEmpty($Tool)) {
     $Tool = if ($env:RALPH_TOOL) { $env:RALPH_TOOL } else { "opencode" }
 }
 
-if ($Tool -notin @("amp", "opencode", "claude")) {
+if ($Tool -notin @("amp", "opencode", "claude", "copilot")) {
     Write-Host "Error: Unknown tool '$Tool'"
-    Write-Host "Valid options: amp, opencode, claude"
+    Write-Host "Valid options: amp, opencode, claude, copilot"
     exit 1
 }
 
@@ -255,7 +247,6 @@ if (-not (Test-Path $ProgressFile)) {
 # =============================================================================
 
 Write-Host "Starting Ralph - Max iterations: $MaxIterations, Tool: $Tool"
-if ($AutoApprove) { Write-Host "  Auto-approve: ENABLED (skipping permission prompts)" }
 if ($DryRun) { Write-Host "  Dry run: ENABLED (no commands will be executed)" }
 
 for ($i = 1; $i -le $MaxIterations; $i++) {

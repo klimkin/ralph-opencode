@@ -2,7 +2,7 @@
 
 ## Overview
 
-Ralph is an autonomous AI agent loop that runs your preferred AI coding tool (Amp, Opencode, or Claude Code) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context.
+Ralph is an autonomous AI agent loop that runs your preferred AI coding tool (Amp, Opencode, Claude Code, or Copilot) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context.
 
 ## Commands
 
@@ -20,22 +20,20 @@ cd flowchart && npm run build
 ./ralph.sh 10 amp      # Use Amp
 ./ralph.sh 10 opencode # Use Opencode (default)
 ./ralph.sh 10 claude   # Use Claude Code
+./ralph.sh 10 copilot  # Use GitHub Copilot CLI
 
 # With options:
-./ralph.sh --auto-approve 10 opencode  # Skip permission prompts
 ./ralph.sh --dry-run 10                # Show what would run without executing
 ./ralph.sh --help                      # Show help
 
 # Or via environment variable:
 RALPH_TOOL=claude ./ralph.sh 10
-RALPH_AUTO_APPROVE=true ./ralph.sh 10
 ```
 
 ## Options
 
 | Option | Env Variable | Description |
 |--------|--------------|-------------|
-| `--auto-approve` | `RALPH_AUTO_APPROVE=true` | Skip all permission prompts (use with caution) |
 | `--dry-run` | - | Show what would be executed without running |
 | `--help` | - | Show help message |
 
@@ -142,7 +140,7 @@ The `flowchart/` directory contains an interactive visualization built with Reac
 The flowchart includes 4 contextual notes that appear at specific steps:
 
 1. **prd.json example** (step 2) - Shows story structure with `dependsOn` field
-2. **CLI options** (step 3) - Documents `--auto-approve` and `--dry-run` flags
+2. **CLI options** (step 3) - Documents `--dry-run` flag
 3. **Dependency explanation** (step 5) - Explains how `dependsOn` ordering works
 4. **AGENTS.md updates** (step 9) - Notes about pattern discovery
 
@@ -180,12 +178,13 @@ Two skills are provided for AI tools:
 - The `tasks/` directory structure: `prd.json`, `progress.txt`, `archive/`
 - OpenCode uses `--model github-copilot/claude-opus-4.5 --agent build` by default
 
-## Auto-Approve Mode
+## Permissions
 
-When running in automation (CI/CD), use `--auto-approve` to skip interactive prompts:
+Ralph always grants full permissions to AI tools:
 
-- **Amp**: Already uses `--dangerously-allow-all`
+- **Amp**: Uses `--dangerously-allow-all`
 - **OpenCode**: Sets `OPENCODE_PERMISSION='"allow"'`
-- **Claude Code**: Adds `--dangerously-skip-permissions` flag
+- **Claude Code**: Uses `--dangerously-skip-permissions` flag
+- **Copilot**: Uses `--allow-all` flag
 
 **Warning**: This grants the AI full permissions. Only use in trusted environments.

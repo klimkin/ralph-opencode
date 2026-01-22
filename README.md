@@ -8,6 +8,7 @@ Supports:
 - [Amp](https://ampcode.com) - [Documentation](https://ampcode.com/manual)
 - [Opencode](https://opencode.ai) - [Documentation](https://opencode.ai/docs)
 - [Claude Code](https://code.claude.com/) - [Documentation](https://code.claude.com/)
+- [GitHub Copilot CLI](https://github.com/github/copilot-cli) - [Documentation](https://github.com/github/copilot-cli)
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
@@ -19,6 +20,7 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
   - [Amp CLI](https://ampcode.com)
   - [Opencode CLI](https://opencode.ai)
   - [Claude Code CLI](https://code.claude.com/)
+  - [GitHub Copilot CLI](https://github.com/github/copilot-cli)
 - `jq` installed (`brew install jq` on macOS)
 - A git repository for your project
 
@@ -93,6 +95,7 @@ This creates `prd.json` with user stories structured for autonomous execution.
 ./scripts/ralph/ralph.sh 10 amp
 ./scripts/ralph/ralph.sh 10 opencode
 ./scripts/ralph/ralph.sh 10 claude
+./scripts/ralph/ralph.sh 10 copilot
 
 # Or use environment variable
 RALPH_TOOL=claude ./scripts/ralph/ralph.sh 10
@@ -218,3 +221,4 @@ Ralph automatically archives previous runs when you start a new feature (differe
 - [Amp documentation](https://ampcode.com/manual)
 - [Opencode documentation](https://opencode.ai/docs)
 - [Claude Code documentation](https://code.claude.com/)
+- [GitHub Copilot CLI](https://github.com/github/copilot-cli)

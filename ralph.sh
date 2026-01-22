@@ -1,11 +1,10 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
 # Usage: ./ralph.sh [options] [max_iterations] [tool]
-# Tools: amp, opencode, claude (default: opencode)
+# Tools: amp, opencode, claude, copilot (default: opencode)
 # Can also use RALPH_TOOL env var
 #
 # Options:
-#   --auto-approve    Skip all permission prompts (use with caution)
 #   --dry-run         Show what would be executed without running
 #   --help            Show this help message
 
@@ -15,7 +14,6 @@ set -e
 # Configuration
 # =============================================================================
 
-AUTO_APPROVE=false
 DRY_RUN=false
 
 # =============================================================================
@@ -29,17 +27,15 @@ Ralph Wiggum - Long-running AI agent loop
 Usage: ./ralph.sh [options] [max_iterations] [tool]
 
 Options:
-  --auto-approve    Skip all permission prompts (use with caution)
   --dry-run         Show what would be executed without running
   --help            Show this help message
 
 Arguments:
   max_iterations    Maximum number of iterations (default: 10)
-  tool              AI tool to use: amp, opencode, claude (default: opencode)
+  tool              AI tool to use: amp, opencode, claude, copilot (default: opencode)
 
 Environment variables:
   RALPH_TOOL          Default tool to use
-  RALPH_AUTO_APPROVE  Set to 'true' to enable auto-approve
 EOF
 }
 
@@ -111,13 +107,18 @@ build_command() {
       ;;
     opencode)
       local prefix=""
-      [ "$AUTO_APPROVE" = true ] && prefix="OPENCODE_PERMISSION='\"allow\"' "
+      prefix="OPENCODE_PERMISSION='\"allow\"' "
       echo "${prefix}opencode run --model github-copilot/claude-opus-4.5 --agent build \"$task\" --file \"$PROMPT_FILE\""
       ;;
     claude)
       local flags=""
-      [ "$AUTO_APPROVE" = true ] && flags="--dangerously-skip-permissions "
+      flags="--dangerously-skip-permissions "
       echo "cat \"$PROMPT_FILE\" | claude -p ${flags}\"$task\""
+      ;;
+    copilot)
+      local flags="--add-dir \"\$(pwd)\" "
+      flags+="--allow-all "
+      echo "cat \"$PROMPT_FILE\" | copilot -p ${flags}\"$task\""
       ;;
   esac
 }
@@ -141,15 +142,12 @@ show_blocked_stories() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --auto-approve) AUTO_APPROVE=true; shift ;;
     --dry-run)      DRY_RUN=true; shift ;;
     --help)         show_help; exit 0 ;;
     -*)             echo "Error: Unknown option '$1'"; echo "Use --help for usage information"; exit 1 ;;
     *)              break ;;
   esac
 done
-
-[ "${RALPH_AUTO_APPROVE:-false}" = "true" ] && AUTO_APPROVE=true
 
 # =============================================================================
 # Path Setup
@@ -167,8 +165,8 @@ PROMPT_FILE="$SCRIPT_DIR/prompt.md"
 
 # Validate tool selection
 case "$TOOL" in
-  amp|opencode|claude) ;;
-  *) echo "Error: Unknown tool '$TOOL'"; echo "Valid options: amp, opencode, claude"; exit 1 ;;
+  amp|opencode|claude|copilot) ;;
+  *) echo "Error: Unknown tool '$TOOL'"; echo "Valid options: amp, opencode, claude, copilot"; exit 1 ;;
 esac
 
 # =============================================================================
@@ -215,7 +213,6 @@ fi
 # =============================================================================
 
 echo "Starting Ralph - Max iterations: $MAX_ITERATIONS, Tool: $TOOL"
-[ "$AUTO_APPROVE" = true ] && echo "  Auto-approve: ENABLED (skipping permission prompts)"
 [ "$DRY_RUN" = true ] && echo "  Dry run: ENABLED (no commands will be executed)"
 
 for (( i=1; i<=MAX_ITERATIONS; i++ )); do

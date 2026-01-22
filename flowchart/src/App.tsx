@@ -74,10 +74,9 @@ const notes = [
     position: { x: 340, y: 260 },
     color: { bg: '#e8f5e9', border: '#4caf50' },
     content: `CLI Options:
---auto-approve  Skip permission prompts
---dry-run       Preview without executing
+--dry-run  Preview without executing
 
-./ralph.sh --auto-approve 10 opencode`,
+./ralph.sh --dry-run 10 opencode`,
   },
   {
     id: 'note-3',
