@@ -1,21 +1,29 @@
 #Requires -Version 7.0
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.ps1 [options] [-MaxIterations <n>] [-Tool <tool>]
+# Usage: ./ralph.ps1 [options] [-MaxIterations <n>] [-Tool <tool>] [-Model <model>]
 # Tools: amp, opencode, claude, copilot (default: opencode)
-# Can also use RALPH_TOOL env var
+# Can also use RALPH_TOOL and RALPH_MODEL env vars
 #
 # Options:
+#   -Model            Model to use (overrides RALPH_MODEL and tool defaults)
 #   -DryRun           Show what would be executed without running
 #   -Help             Show this help message
 
 param(
     [int]$MaxIterations = 10,
     [string]$Tool = "",
+    [string]$Model = "",
     [switch]$DryRun,
     [switch]$Help
 )
 
 $ErrorActionPreference = "Stop"
+
+# Tool-specific default models
+$DefaultModelOpencode = "github-copilot/claude-opus-4.5"
+$DefaultModelClaude = "claude-opus-4-5"
+$DefaultModelAmp = "github-copilot/claude-opus-4.5"
+$DefaultModelCopilot = "github-copilot/claude-opus-4.5"
 
 # =============================================================================
 # Helper Functions
@@ -25,18 +33,25 @@ function Show-Help {
     @"
 Ralph Wiggum - Long-running AI agent loop
 
-Usage: ./ralph.ps1 [options] [-MaxIterations <n>] [-Tool <tool>]
+Usage: ./ralph.ps1 [options] [-MaxIterations <n>] [-Tool <tool>] [-Model <model>]
 
 Options:
+  -Model            Model to use (overrides RALPH_MODEL and tool defaults)
   -DryRun           Show what would be executed without running
   -Help             Show this help message
 
 Arguments:
   -MaxIterations    Maximum number of iterations (default: 10)
   -Tool             AI tool to use: amp, opencode, claude, copilot (default: opencode)
+  -Model            Model to use for the AI tool
 
 Environment variables:
   RALPH_TOOL          Default tool to use
+  RALPH_MODEL         Default model to use (overrides tool-specific defaults)
+
+Tool-specific default models:
+  opencode, amp, copilot: github-copilot/claude-opus-4.5
+  claude:                 claude-opus-4-5
 "@
 }
 
@@ -98,19 +113,20 @@ function Build-Command {
     param([string]$ToolName, [string]$StoryId, [string]$StoryTitle)
 
     $task = "Execute story ${StoryId}: $StoryTitle"
+    $model = Get-ModelForTool -ToolName $ToolName
 
     switch ($ToolName) {
         "amp" {
-            "Get-Content `"$script:PromptFile`" -Raw | amp --dangerously-allow-all `"$task`""
+            "Get-Content `"$script:PromptFile`" -Raw | amp --model `"$model`" --dangerously-allow-all `"$task`""
         }
         "opencode" {
-            "[with OPENCODE_PERMISSION='`"allow`"'] opencode run --model github-copilot/claude-opus-4.5 --agent build `"$task`" --file `"$script:PromptFile`""
+            "[with OPENCODE_PERMISSION='`"allow`"'] opencode run --model `"$model`" --agent build `"$task`" --file `"$script:PromptFile`""
         }
         "claude" {
-            "Get-Content `"$script:PromptFile`" -Raw | claude -p --dangerously-skip-permissions `"$task`""
+            "Get-Content `"$script:PromptFile`" -Raw | claude -p --model `"$model`" --dangerously-skip-permissions `"$task`""
         }
         "copilot" {
-            "Get-Content `"$script:PromptFile`" -Raw | copilot -p --add-dir `"$(Get-Location)`" --allow-all `"$task`""
+            "Get-Content `"$script:PromptFile`" -Raw | copilot -p --model `"$model`" --add-dir `"$(Get-Location)`" --allow-all `"$task`""
         }
     }
 }
@@ -119,20 +135,21 @@ function Invoke-Tool {
     param([string]$ToolName, [string]$StoryId, [string]$StoryTitle)
 
     $task = "Execute story ${StoryId}: $StoryTitle"
+    $model = Get-ModelForTool -ToolName $ToolName
 
     switch ($ToolName) {
         "amp" {
-            Get-Content $script:PromptFile -Raw | amp --dangerously-allow-all $task
+            Get-Content $script:PromptFile -Raw | amp --model $model --dangerously-allow-all $task
         }
         "opencode" {
             $env:OPENCODE_PERMISSION = '"allow"'
-            opencode run --model github-copilot/claude-opus-4.5 --agent build $task --file $script:PromptFile
+            opencode run --model $model --agent build $task --file $script:PromptFile
         }
         "claude" {
-            Get-Content $script:PromptFile -Raw | claude -p --dangerously-skip-permissions $task
+            Get-Content $script:PromptFile -Raw | claude -p --model $model --dangerously-skip-permissions $task
         }
         "copilot" {
-            Get-Content $script:PromptFile -Raw | copilot -p --add-dir (Get-Location) --allow-all $task
+            Get-Content $script:PromptFile -Raw | copilot -p --model $model --add-dir (Get-Location) --allow-all $task
         }
     }
 }
@@ -156,6 +173,20 @@ function Get-Progress {
     $percent = if ($total -gt 0) { [math]::Floor($complete * 100 / $total) } else { 0 }
 
     @{ Total = $total; Complete = $complete; Percent = $percent }
+}
+
+function Get-ModelForTool {
+    param([string]$ToolName)
+
+    if ($script:Model) { return $script:Model }
+    if ($env:RALPH_MODEL) { return $env:RALPH_MODEL }
+
+    switch ($ToolName) {
+        "opencode" { $script:DefaultModelOpencode }
+        "claude"   { $script:DefaultModelClaude }
+        "amp"      { $script:DefaultModelAmp }
+        "copilot"  { $script:DefaultModelCopilot }
+    }
 }
 
 # =============================================================================
@@ -246,7 +277,7 @@ if (-not (Test-Path $ProgressFile)) {
 # Main Loop
 # =============================================================================
 
-Write-Host "Starting Ralph - Max iterations: $MaxIterations, Tool: $Tool"
+Write-Host "Starting Ralph - Max iterations: $MaxIterations, Tool: $Tool, Model: $(Get-ModelForTool -ToolName $Tool)"
 if ($DryRun) { Write-Host "  Dry run: ENABLED (no commands will be executed)" }
 
 for ($i = 1; $i -le $MaxIterations; $i++) {

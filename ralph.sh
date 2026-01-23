@@ -2,9 +2,10 @@
 # Ralph Wiggum - Long-running AI agent loop
 # Usage: ./ralph.sh [options] [max_iterations] [tool]
 # Tools: amp, opencode, claude, copilot (default: opencode)
-# Can also use RALPH_TOOL env var
+# Can also use RALPH_TOOL and RALPH_MODEL env vars
 #
 # Options:
+#   --model <model>   Model to use (overrides RALPH_MODEL and tool defaults)
 #   --dry-run         Show what would be executed without running
 #   --help            Show this help message
 
@@ -15,6 +16,13 @@ set -e
 # =============================================================================
 
 DRY_RUN=false
+MODEL=""
+
+# Tool-specific default models
+DEFAULT_MODEL_OPENCODE="litellm/github-copilot/claude-opus-4.5"
+DEFAULT_MODEL_CLAUDE="claude-opus-4-5"
+DEFAULT_MODEL_AMP="github-copilot/claude-opus-4.5"
+DEFAULT_MODEL_COPILOT="github-copilot/claude-opus-4.5"
 
 # =============================================================================
 # Helper Functions
@@ -27,6 +35,7 @@ Ralph Wiggum - Long-running AI agent loop
 Usage: ./ralph.sh [options] [max_iterations] [tool]
 
 Options:
+  --model <model>   Model to use (overrides RALPH_MODEL and tool defaults)
   --dry-run         Show what would be executed without running
   --help            Show this help message
 
@@ -36,6 +45,11 @@ Arguments:
 
 Environment variables:
   RALPH_TOOL          Default tool to use
+  RALPH_MODEL         Default model to use (overrides tool-specific defaults)
+
+Tool-specific default models:
+  opencode, amp, copilot: github-copilot/claude-opus-4.5
+  claude:                 claude-opus-4-5
 EOF
 }
 
@@ -96,29 +110,48 @@ get_pending_deps() {
   echo "$pending"
 }
 
+# Get the model to use for a given tool
+get_model_for_tool() {
+  local tool="$1"
+  if [ -n "$MODEL" ]; then
+    echo "$MODEL"
+  elif [ -n "$RALPH_MODEL" ]; then
+    echo "$RALPH_MODEL"
+  else
+    case "$tool" in
+      opencode) echo "$DEFAULT_MODEL_OPENCODE" ;;
+      claude)   echo "$DEFAULT_MODEL_CLAUDE" ;;
+      amp)      echo "$DEFAULT_MODEL_AMP" ;;
+      copilot)  echo "$DEFAULT_MODEL_COPILOT" ;;
+    esac
+  fi
+}
+
 # Build the command for a given tool
 build_command() {
   local tool="$1" story_id="$2" story_title="$3"
   local task="Execute story $story_id: $story_title"
+  local model
+  model=$(get_model_for_tool "$tool")
 
   case "$tool" in
     amp)
-      echo "cat \"$PROMPT_FILE\" | amp --dangerously-allow-all \"$task\""
+      echo "cat \"$PROMPT_FILE\" | amp --model \"$model\" --dangerously-allow-all \"$task\""
       ;;
     opencode)
       local prefix=""
       prefix="OPENCODE_PERMISSION='\"allow\"' "
-      echo "${prefix}opencode run --model github-copilot/claude-opus-4.5 --agent build \"$task\" --file \"$PROMPT_FILE\""
+      echo "${prefix}opencode run --model \"$model\" --agent build \"$task\" --file \"$PROMPT_FILE\""
       ;;
     claude)
       local flags=""
       flags="--dangerously-skip-permissions "
-      echo "cat \"$PROMPT_FILE\" | claude -p ${flags}\"$task\""
+      echo "cat \"$PROMPT_FILE\" | claude -p --model \"$model\" ${flags}\"$task\""
       ;;
     copilot)
       local flags="--add-dir \"\$(pwd)\" "
       flags+="--allow-all "
-      echo "cat \"$PROMPT_FILE\" | copilot -p ${flags}\"$task\""
+      echo "cat \"$PROMPT_FILE\" | copilot -p --model \"$model\" ${flags}\"$task\""
       ;;
   esac
 }
@@ -142,6 +175,7 @@ show_blocked_stories() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --model)        MODEL="$2"; shift 2 ;;
     --dry-run)      DRY_RUN=true; shift ;;
     --help)         show_help; exit 0 ;;
     -*)             echo "Error: Unknown option '$1'"; echo "Use --help for usage information"; exit 1 ;;
@@ -212,7 +246,7 @@ fi
 # Main Loop
 # =============================================================================
 
-echo "Starting Ralph - Max iterations: $MAX_ITERATIONS, Tool: $TOOL"
+echo "Starting Ralph - Max iterations: $MAX_ITERATIONS, Tool: $TOOL, Model: $(get_model_for_tool $TOOL)"
 [ "$DRY_RUN" = true ] && echo "  Dry run: ENABLED (no commands will be executed)"
 
 for (( i=1; i<=MAX_ITERATIONS; i++ )); do
