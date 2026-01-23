@@ -140,7 +140,7 @@ build_command() {
       ;;
     opencode)
       local prefix=""
-      prefix="OPENCODE_PERMISSION='\"allow\"' "
+      prefix="OPENCODE_PERMISSION='{\"*\": \"allow\"}' "
       echo "${prefix}opencode run --model \"$model\" --agent build \"$task\" --file \"$PROMPT_FILE\""
       ;;
     claude)
